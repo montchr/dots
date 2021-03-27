@@ -62,6 +62,25 @@ function user::allow_passwordless_sudo () {
   sudo bash -c "echo '${1} ALL=(ALL) NOPASSWD: ALL' | (EDITOR='tee -a' visudo)"
 }
 
+# Get SSH authorized keys.
+# Globals:
+#   CDOM_INIT_PUBKEY
+function user::get_ssh_pub_key() {
+  local key
+  if [[ -n "${CDOM_INIT_PUBKEY}" ]]; then
+    key="${CDOM_INIT_PUBKEY}"
+  else
+    ask_for_confirmation "Use root's authorized SSH keys for ${USERNAME}?"
+    if user_confirmed; then
+      key=$(<"${HOME}/.ssh/authorized_keys")
+    else
+      ask 'Paste in the public SSH key for the new user:\n'
+      key=$(get_answer)
+    fi
+  fi
+  echo "$key"
+}
+
 # Add an SSH public key for a user.
 # Parameters:
 #   Username
@@ -128,15 +147,10 @@ function user::main () {
 
   user::create_account "${USERNAME}" "${PASSWORD}"
 
-  if [[ -n "${CDOM_INIT_PUBKEY}" ]]; then
-    ssh_pub_key="${CDOM_INIT_PUBKEY}"
-  else
-    ask 'Paste in the public SSH key for the new user:\n'
-    ssh_pub_key=$(get_answer)
-  fi
-
   user::allow_passwordless_sudo "${USERNAME}" \
-    && user::add_ssh_pub_key "${USERNAME}" "${ssh_pub_key}" \
+    && user::add_ssh_pub_key \
+        "${USERNAME}" \
+        user::get_ssh_pub_key \
     && user::change_ssh_config
   print_result $? "Configure SSH"
 }
