@@ -81,6 +81,3 @@
 (package! firestarter)               ; Do things upon save.
 (package! magit-delta)               ; Use delta in magit diffs.
 (package! with-editor)               ; pass $EDITOR to embedded terminal processes
-
-;; Miscellaneous
-(package! vlf)                       ; open Very Large Files in chunks

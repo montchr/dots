@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+#
+# dots-ci-linode
+#
+
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+
+. ../lib/utils.sh
+
+LINODE_LABEL="cdom-dots"
+LINODE_IMAGE_LABEL="cdom-dots ubuntu 20.04 fresh"
+
+
+# Keep prompting for the password and password confirmation.
+# Globals:
+#   PASSWORD
+function .prompt_for_password () {
+  local passwords_match=0
+  local confirmation
+  while [ "${passwords_match}" -eq "0" ]; do
+    ask_silently "Enter new password:"
+    PASSWORD=$(get_answer)
+
+    ask_silently "Confirm password:"
+    confirmation=$(get_answer)
+
+    if [[ "${PASSWORD}" != "${confirmation}" ]]; then
+      print_error "Passwords do not match! Please try again."
+    else
+      passwords_match=1
+    fi
+  done
+}
+
+# Get a field from a Linode resource.
+# Parameters:
+#   Resource type (singular)
+#   Resource label
+#   Field key
+function .get_field() {
+  local type=$1
+  local label="$2"
+  local key="$3"
+  linode-cli "${type}s" list \
+    --format="${key}" \
+    --label="${label}" \
+    --no-headers \
+    --text
+}
+
+# Whether a linode with the specified label is rebuilding.
+# Parameters:
+#   Linode label
+function is_rebuilding() {
+  [[ "rebuilding" == $(.get_field linode "$1" status) ]]
+}
+
+# Whether a linode with the specified label is running.
+# Parameters:
+#   Linode label
+function is_running() {
+  [[ "running" == $(.get_field linode "$1" status) ]]
+}
+
+# Print a human-friendly table of info about the specified linode.
+# Parameters:
+#   Linode label
+function print_linode_info() {
+  linode-cli linodes list --label="$1"
+}
+
+# Set the global $PASSWORD env var by generation or by prompt.
+# No effect if $PASSWORD is already set.
+# Globals:
+#   PASSWORD
+function set_password_global() {
+  [[ -n $PASSWORD ]] \
+    && return
+
+  ask_for_confirmation "Do you want to generate a new password?"
+  if user_confirmed; then
+    if cmd_exists bw; then
+      PASSWORD=$(bw generate --words 3 --separator '.' -p)
+      print_success "Generated new password:"
+      print_info    "    ${PASSWORD}" ; printf "\n"
+    else
+      print_error "[Error]" "Couldn't find a password generator!"
+    fi
+  else
+    .prompt_for_password
+  fi
+}
+
+# Initialize a rebuild of the specified linode from an image.
+# Parameters:
+#   Linode label
+#   Source image label
+#   Root password
+function init_rebuild() {
+  local linode_label=$1
+  local image_label=$2
+  local pass=$3
+
+  print_linode_info "${linode_label}"
+
+  print_warning "The CI linode will be destroyed and rebuilt!"
+  ask_for_confirmation "Do you want to continue?"
+
+  if ! user_confirmed; then
+    print_error "Cancelled!" "Exiting..."
+    exit 1
+  fi
+
+  id=$(.get_field linode "${linode_label}" id)
+  image=$(.get_field image "${image_label}" id)
+
+  linode-cli linodes rebuild "${id}" \
+    --image="${image}" \
+    --root_pass="${pass}"
+  print_result $? "Initiated linode rebuild"
+}
+
+# Monitor the rebuild status of the specified linode.
+# Parameters:
+#   Linode label
+function check_status() {
+  local label=$1
+  local pause=10
+
+  until is_rebuilding "${label}"; do
+    [[ pause -eq 0 ]] && {
+      print_error "[Error]" "Status check timed out. Aborting."
+      print_warning "You may want to verify the status manually."
+      return 1
+    }
+
+    # The Linode CLI doesn't appear to report the linode's "rebuilding" status
+    # immediately, so decrease the wait time in an attempt to catch the change
+    # in status.
+    execute "sleep ${pause}" "Waiting for 'rebuilding' status (${pause}s)" \
+      && pause=$(( pause - 2 ))
+  done
+
+  print_warning "Linode is rebuilding!"
+
+  pause=10
+  until is_running "${label}"; do
+    execute "sleep ${pause}" "Waiting for 'running' status..."
+  done
+
+  print_success "Linode '${label}' is running!"
+}
+
+# Main entrypoint.
+function main() {
+
+  if ! cmd_exists "linode-cli"; then
+    print_error "[Error]" "linode-cli not found!"
+    exit 1
+  fi
+
+  if is_rebuilding "${LINODE_LABEL}"; then
+    print_linode_info "${LINODE_LABEL}"
+    print_error "The linode '${LINODE_LABEL}' is already rebuilding!" "Aborting."
+    exit 1
+  fi
+
+  set_password_global
+
+  init_rebuild \
+    "${LINODE_LABEL}" \
+    "${LINODE_IMAGE_LABEL}" \
+    "${PASSWORD}"
+
+  check_status "${LINODE_LABEL}"
+
+  print_linode_info "${LINODE_LABEL}"
+}
+
+main "$@"

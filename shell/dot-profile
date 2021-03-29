@@ -4,6 +4,12 @@
 #
 # Core shell environment setup file.
 #
+# Ideally, this should be sourced by all shells as early as possible, as it sets
+# important environment variables.
+#
+# Bash:  source within ~/.bash_profile
+# ZSH:   source within ~/.zshenv (reloads on every prompt, so keep this file light!)
+#
 
 
 # Check whether a command exists.
@@ -41,8 +47,7 @@ export \
   DOTFILES="$HOME/.dotfiles" \
   KITTY_CONFIG_DIRECTORY="${XDG_CONFIG_HOME}/kitty" \
   KITTY_SOCKET="unix:${XDG_RUNTIME_DIR}/kitty-socket" \
-  TMPDIR=${TMPDIR:-${XDG_RUNTIME_DIR}} \
-  ZSH_DOTS="$DOTS/zsh"
+  TMPDIR=${TMPDIR:-${XDG_RUNTIME_DIR}}
 
 if [[ $IS_LINUX ]]; then
   export \

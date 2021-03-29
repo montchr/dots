@@ -309,6 +309,8 @@ show_spinner() {
   local i=0
   local frameText=""
 
+  TRAVIS="${TRAVIS:-false}"
+
   # Travis CI needs special treatment.
   if [ "$TRAVIS" != "true" ]; then
     # Provide more space so that the text hopefully doesn't reach the bottom
