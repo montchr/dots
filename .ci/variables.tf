@@ -1,6 +1,23 @@
-variable "BRANCH" {
-  default = "main"
+# ================================
+# Required
+# ================================
+
+variable "api_token" {
+  description = "Linode API token"
+  sensitive   = true
 }
-variable "LINODE_API_TOKEN" {}
-variable "ROOT_PASS" {}
-variable "SSH_PUB_KEY" {}
+
+
+# ================================
+# Optional
+# ================================
+
+variable "branch" {
+  description = "Git branch"
+  default     = "main"
+}
+
+variable "region" {
+  description = "Linode region"
+  default     = "us-east"
+}

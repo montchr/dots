@@ -2,21 +2,28 @@ terraform {
   required_providers {
     linode = {
       source  = "linode/linode"
-      version = "1.16.0"
+      version = "1.18.0"
     }
   }
 }
 
 provider "linode" {
-  token = var.LINODE_API_TOKEN
+  token = var.api_token
 }
 
-module "ci-feature-branch" {
-  for_each = toset(["ubuntu20.04"])
-  source   = "./modules/ci-feature-branch"
-
-  authorized_keys = [var.SSH_PUB_KEY]
-  branch          = var.BRANCH
-  image_id        = "linode/${each.key}"
-  root_pass       = var.ROOT_PASS
+resource "linode_instance" "ubuntu-20-04" {
+  image  = "linode/ubuntu20.04"
+  label  = "ci-dotfield-${var.branch}-ubuntu20-04"
+  group  = "Dotfield CI"
+  region = var.region
+  type   = "g6-nanode-1"
 }
+
+# TODO: enable CI for debian
+# resource "linode_instance" "debian10" {
+#   image           = "linode/debian10"
+#   label           = "ci-dotfield-${var.branch}-debian10"
+#   group           = "Dotfield CI"
+#   region          = var.region
+#   type            = "g6-nanode-1"
+# }
