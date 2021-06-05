@@ -46,4 +46,9 @@
     };
   };
 
+  my.user.packages = with pkgs; [
+    linode-cli
+    terraform_0_15
+  ];
+
 }

@@ -48,8 +48,6 @@ in
         editorconfig-core-c
         # :tools lookup & :lang org +roam
         sqlite
-        # :tools terraform
-        terraform
         # :lang javascript
         nodePackages.javascript-typescript-langserver
         # :lang org
